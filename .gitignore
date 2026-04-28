@@ -1,0 +1,17 @@
+@'
+.venv/
+__pycache__/
+.pytest_cache/
+tmp_pytest/
+tmp_pytest_sqlite/
+tmp_pytest_sqlite_2/
+*.pyc
+*.pyo
+*.log
+*.db
+*.sqlite
+*.sqlite3
+fallback_events.jsonl
+work_intelligence_service.log
+.env
+'@ | Set-Content .gitignore -Encoding UTF8

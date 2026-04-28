@@ -1,0 +1,62 @@
+{
+  "notes": {
+    "required_before_start": [
+      "watch_paths",
+      "laptop_root",
+      "workbook_path",
+      "backup_root",
+      "owner",
+      "device",
+      "category_rules",
+      "importance_keywords"
+    ],
+    "optional_runtime_mounts": [
+      "microsd_root",
+      "wd_root"
+    ],
+    "validation_behavior": [
+      "The service fails fast if required config is missing or invalid.",
+      "The service fails fast if the workbook file is missing.",
+      "The service validates that Activity_Log and Sessions sheets exist with required headers before watcher startup.",
+      "Missing microsd_root or wd_root produces a warning at runtime and does not block startup.",
+      "Heartbeat, shutdown drain timeout, and queue warning settings are optional and defaulted if omitted."
+    ]
+  },
+  "watch_paths": ["C:\\XROIQ\\work"],
+  "ignore_dirs": [".git", "node_modules", ".next", "dist", "build", "__pycache__", ".venv", "venv", ".idea", ".vs", ".turbo"],
+  "ignore_extensions": [".tmp", ".log", ".cache", ".part", ".crdownload", ".lock"],
+  "session_gap_minutes": 10,
+  "event_debounce_seconds": 8,
+  "heartbeat_interval_seconds": 300,
+  "shutdown_drain_timeout_seconds": 10,
+  "queue_warning_size": 500,
+  "owner": "Karne",
+  "device": "LAP-002",
+  "laptop_root": "C:\\XROIQ\\work",
+  "microsd_root": "E:\\XROIQ_STAGE",
+  "wd_root": "D:\\XROIQ_ARCHIVE",
+  "copy_recent_to_microsd": true,
+  "copy_stable_to_wd": true,
+  "stable_days_before_wd": 7,
+  "workbook_path": "C:\\XROIQ\\ops\\XROIQ_Work_Intelligence_Template.xlsx",
+  "backup_root": "C:\\XROIQ\\ops\\logs",
+  "category_rules": {
+    "Build": {
+      "extensions": [".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".yml", ".yaml", ".env", ".sql", ".sh", ".ps1", ".bat"]
+    },
+    "R&D": {
+      "extensions": [".md", ".txt", ".pdf", ".csv", ".parquet", ".ipynb"]
+    },
+    "Admin": {
+      "extensions": [".docx", ".xlsx", ".pptx", ".msg", ".rtf"]
+    },
+    "Communications": {
+      "path_keywords": ["mail", "outlook", "inbox", "teams", "slack", "meeting", "calendar"]
+    }
+  },
+  "importance_keywords": {
+    "High": ["final", "production", "invoice", "contract", "launch", "master"],
+    "Medium": ["draft", "review", "notes"],
+    "Low": []
+  }
+}
