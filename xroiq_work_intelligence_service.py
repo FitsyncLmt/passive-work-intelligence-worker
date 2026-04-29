@@ -15,9 +15,12 @@ from openpyxl import load_workbook
 from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
+from xroiq_store import init_db, insert_event, insert_session
+
 
 APP_NAME = "XROIQ Work Intelligence Service"
 DEFAULT_CONFIG_PATH = Path(__file__).with_name("xroiq_work_intelligence_config.json")
+DEFAULT_DATABASE_PATH = r"C:\\XROIQ\\ops\\data\\xroiq_work_intelligence.db"
 
 
 DEFAULT_CONFIG = {
@@ -39,6 +42,7 @@ DEFAULT_CONFIG = {
     "stable_days_before_wd": 7,
     "workbook_path": r"C:\\XROIQ\\ops\\XROIQ_Work_Intelligence_Template.xlsx",
     "backup_root": r"C:\\XROIQ\\ops\\logs",
+    "database_path": DEFAULT_DATABASE_PATH,
     "category_rules": {
         "Build": {
             "extensions": [".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".yml", ".yaml", ".env", ".sql", ".sh", ".ps1", ".bat"]
@@ -294,6 +298,7 @@ class WorkIntelligenceService:
         self.config = self.apply_optional_defaults(loaded_config)
         self.validated_paths = self.validate_config(self.config)
         self.logger = WorkbookLogger(Path(self.config["workbook_path"]))
+        self.database_path = self.validated_paths["database_path"]
         self.fallback_writer = FallbackEventWriter(
             self.validated_paths["backup_root"] / "fallback_events.jsonl"
         )
@@ -329,6 +334,7 @@ class WorkIntelligenceService:
         merged_config = dict(config)
         for field, default_value in OPTIONAL_CONFIG_DEFAULTS.items():
             merged_config.setdefault(field, default_value)
+        merged_config.setdefault("database_path", DEFAULT_DATABASE_PATH)
         return merged_config
 
     @staticmethod
@@ -373,10 +379,14 @@ class WorkIntelligenceService:
                     f"Config field '{field}' must be a positive integer."
                 )
 
+        if not isinstance(config.get("database_path"), str) or not config["database_path"].strip():
+            raise ConfigurationError("Config field 'database_path' must be a non-empty string.")
+
         validated_paths = {
             "laptop_root": Path(config["laptop_root"]).expanduser(),
             "workbook_path": Path(config["workbook_path"]).expanduser(),
             "backup_root": Path(config["backup_root"]).expanduser(),
+            "database_path": Path(config["database_path"]).expanduser(),
             "microsd_root": Path(config["microsd_root"]).expanduser()
             if config.get("microsd_root")
             else None,
@@ -499,6 +509,14 @@ class WorkIntelligenceService:
 
     def validate_runtime(self) -> None:
         self.logger.validate_workbook_structure()
+        try:
+            init_db(self.database_path)
+            self.log.info("SQLite database initialized: %s", self.database_path)
+        except Exception:
+            self.log.error(
+                "SQLite database initialization failed; continuing with Excel logging",
+                exc_info=True,
+            )
         self._warn_optional_mounts()
         self._log_startup_summary()
 
@@ -522,6 +540,7 @@ class WorkIntelligenceService:
         self.log.info("Validated workbook: %s", self.validated_paths["workbook_path"])
         self.log.info("Validated laptop root: %s", self.validated_paths["laptop_root"])
         self.log.info("Validated backup root: %s", self.validated_paths["backup_root"])
+        self.log.info("Validated SQLite database path: %s", self.database_path)
         self.log.info("Fallback event log: %s", self.fallback_writer.path)
 
     def should_ignore(self, path: Path) -> bool:
@@ -801,7 +820,58 @@ class WorkIntelligenceService:
             "handled_action": handled_action,
             "backup_status": backup_status,
             "notes": notes,
+            "project": self._derive_project(parent_folder),
         }
+
+    @staticmethod
+    def _derive_project(parent_folder: str) -> str:
+        cleaned = (parent_folder or "").strip()
+        if not cleaned or cleaned == ".":
+            return ""
+        return cleaned.replace("\\", "/").split("/")[0]
+
+    def _write_sqlite_event(self, event_payload: Dict[str, Any]) -> None:
+        try:
+            insert_event(self.database_path, event_payload)
+        except Exception:
+            self.log.error(
+                "Failed to write SQLite event for %s",
+                event_payload.get("event_id"),
+                exc_info=True,
+            )
+
+    def _write_sqlite_session(
+        self,
+        *,
+        session_key: str,
+        record: EventRecord,
+        category: str,
+        parent_folder: str,
+        notes: str,
+    ) -> None:
+        try:
+            insert_session(
+                self.database_path,
+                {
+                    "session_key": session_key,
+                    "start_time": self._format_timestamp(record.when),
+                    "end_time": self._format_timestamp(record.when),
+                    "duration_minutes": 1,
+                    "category": category,
+                    "project": self._derive_project(parent_folder),
+                    "primary_file": record.path.name,
+                    "event_count": 1,
+                    "device": self.config.get("device", "LAP-002"),
+                    "source": "PythonWatcher",
+                    "notes": notes,
+                },
+            )
+        except Exception:
+            self.log.error(
+                "Failed to write SQLite session for %s",
+                session_key,
+                exc_info=True,
+            )
 
     def _write_fallback_event(
         self,
@@ -871,6 +941,19 @@ class WorkIntelligenceService:
                     failed_stage="session_write",
                     error=exc,
                 )
+                self._write_sqlite_event(
+                    self._build_event_payload(
+                        event_id=event_id,
+                        record=record,
+                        category=category,
+                        importance=importance,
+                        parent_folder=parent_folder,
+                        handled_action=decision["action"] or "kept_on_laptop",
+                        backup_status=decision["backup_status"] or "failed:Unknown",
+                        session_key=None,
+                        notes=notes,
+                    )
+                )
                 self.log.error(
                     "Failed to write session for %s; event captured in fallback log=%s",
                     event_id,
@@ -878,6 +961,14 @@ class WorkIntelligenceService:
                     exc_info=True,
                 )
                 return
+
+            self._write_sqlite_session(
+                session_key=session_key,
+                record=record,
+                category=category,
+                parent_folder=parent_folder,
+                notes=notes,
+            )
 
             event_payload = self._build_event_payload(
                 event_id=event_id,
@@ -910,6 +1001,7 @@ class WorkIntelligenceService:
             ]
             try:
                 self.logger.append_activity(row)
+                self._write_sqlite_event(event_payload)
                 self.log.info("Logged %s | %s | %s", category, record.event_type, path)
             except Exception as exc:
                 fallback_written = self._write_fallback_event(
@@ -917,6 +1009,7 @@ class WorkIntelligenceService:
                     failed_stage="activity_write",
                     error=exc,
                 )
+                self._write_sqlite_event(event_payload)
                 self.log.error(
                     "Failed to write activity for %s; event captured in fallback log=%s",
                     event_id,

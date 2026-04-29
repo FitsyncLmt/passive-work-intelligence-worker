@@ -40,6 +40,7 @@
   "stable_days_before_wd": 7,
   "workbook_path": "C:\\XROIQ\\ops\\XROIQ_Work_Intelligence_Template.xlsx",
   "backup_root": "C:\\XROIQ\\ops\\logs",
+  "database_path": "C:\\XROIQ\\ops\\data\\xroiq_work_intelligence.db",
   "category_rules": {
     "Build": {
       "extensions": [".ts", ".tsx", ".js", ".jsx", ".py", ".json", ".yml", ".yaml", ".env", ".sql", ".sh", ".ps1", ".bat"]
