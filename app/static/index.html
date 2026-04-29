@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XROIQ Work Intelligence</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <main class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Local Console</p>
+          <h1>XROIQ Work Intelligence</h1>
+        </div>
+        <div class="status-pill" id="refreshStatus">Loading</div>
+      </header>
+
+      <section class="summary-grid" aria-label="Summary">
+        <article class="summary-card">
+          <span>DB Connected</span>
+          <strong id="dbConnected">-</strong>
+        </article>
+        <article class="summary-card">
+          <span>Events</span>
+          <strong id="eventsCount">0</strong>
+        </article>
+        <article class="summary-card">
+          <span>Sessions</span>
+          <strong id="sessionsCount">0</strong>
+        </article>
+        <article class="summary-card">
+          <span>Devices</span>
+          <strong id="devicesCount">0</strong>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Service Status</h2>
+        </div>
+        <dl class="status-list">
+          <div><dt>Status</dt><dd id="serviceStatus">-</dd></div>
+          <div><dt>Database</dt><dd id="databasePath">-</dd></div>
+          <div><dt>Last Refresh</dt><dd id="lastRefresh">-</dd></div>
+        </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Recent Events</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Event</th>
+                <th>Time</th>
+                <th>Type</th>
+                <th>File</th>
+                <th>Category</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="eventsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Recent Sessions</h2>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Session</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Category</th>
+                <th>Project</th>
+                <th>Events</th>
+              </tr>
+            </thead>
+            <tbody id="sessionsBody"></tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel two-column">
+        <div>
+          <div class="panel-heading">
+            <h2>Devices</h2>
+          </div>
+          <div id="devicesList" class="list"></div>
+        </div>
+        <div>
+          <div class="panel-heading">
+            <h2>Recent Actions</h2>
+          </div>
+          <div id="actionsList" class="list"></div>
+        </div>
+      </section>
+    </main>
+    <script src="/app.js"></script>
+  </body>
+</html>
