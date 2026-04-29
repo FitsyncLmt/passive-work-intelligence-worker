@@ -276,7 +276,7 @@ tbody tr:hover {
 
 .command-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 10px;
 }
 
@@ -292,6 +292,24 @@ button {
 
 button:hover {
   border-color: var(--accent);
+}
+
+.warning-list {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.warning-item {
+  border: 1px solid var(--warn);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: rgba(210, 153, 34, 0.08);
+}
+
+.warning-item strong {
+  display: block;
+  margin-bottom: 4px;
 }
 
 @media (max-width: 900px) {

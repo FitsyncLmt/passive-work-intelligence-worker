@@ -5,10 +5,12 @@ const endpoints = {
   devices: "/api/devices",
   deviceHealth: "/api/device-health",
   summary: "/api/summary",
+  storageDecisions: "/api/storage-decisions",
   actions: "/api/actions",
   refreshDeviceHealth: "/api/actions/refresh-device-health",
   backupSqlite: "/api/actions/backup-sqlite",
   generateDailyReport: "/api/actions/generate-daily-report",
+  generateFounderIntelligenceReport: "/api/actions/generate-founder-intelligence-report",
   openLogs: "/api/actions/open-logs",
 };
 
@@ -131,6 +133,33 @@ function renderSummary(summary) {
   renderKeyValueList("sessionMinutesByCategory", summary.session_minutes_by_category, " min");
 }
 
+function renderStorageDecisions(storageDecisions) {
+  const warnings = document.getElementById("storageWarnings");
+  const warningItems = storageDecisions.warnings || [];
+  warnings.innerHTML = warningItems.length ? warningItems.map((warning) => `
+    <div class="warning-item">
+      <strong>${html(warning.recommendation)}</strong>
+      <span>${html(warning.target)} | ${html(warning.reason)}</span>
+    </div>
+  `).join("") : `<div class="muted">No storage warnings.</div>`;
+
+  const body = document.getElementById("storageDecisionsBody");
+  const items = storageDecisions.items || [];
+  body.innerHTML = items.length ? items.map((item) => `
+    <tr>
+      <td>${html(item.recommendation)}</td>
+      <td>${html(item.file_name || item.full_path)}</td>
+      <td>${html(item.category)}</td>
+      <td>${html(item.target)}</td>
+      <td>${html(item.reason)}</td>
+    </tr>
+  `).join("") : `
+    <tr>
+      <td colspan="5" class="muted">No storage decisions recorded.</td>
+    </tr>
+  `;
+}
+
 function renderActions(actions) {
   const list = document.getElementById("actionsList");
   list.innerHTML = actions.length ? actions.map((action) => `
@@ -144,13 +173,14 @@ function renderActions(actions) {
 
 async function refresh() {
   try {
-    const [health, events, sessions, devices, deviceHealth, summary, actions] = await Promise.all([
+    const [health, events, sessions, devices, deviceHealth, summary, storageDecisions, actions] = await Promise.all([
       fetchJson(endpoints.health),
       fetchJson(endpoints.events),
       fetchJson(endpoints.sessions),
       fetchJson(endpoints.devices),
       fetchJson(endpoints.deviceHealth),
       fetchJson(endpoints.summary),
+      fetchJson(endpoints.storageDecisions),
       fetchJson(endpoints.actions),
     ]);
 
@@ -166,6 +196,7 @@ async function refresh() {
     renderSessions(sessions.items);
     renderDeviceHealth(deviceHealth.items);
     renderSummary(summary);
+    renderStorageDecisions(storageDecisions);
     renderDevices(devices.items);
     renderActions(actions.items);
     setStatus(true, "Live");

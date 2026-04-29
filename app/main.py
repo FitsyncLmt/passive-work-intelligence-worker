@@ -23,7 +23,9 @@ from xroiq_store import (
     list_sessions,
 )
 from xroiq_device_intelligence import refresh_configured_device_health
+from xroiq_founder_intelligence import generate_founder_intelligence_report
 from xroiq_reports import backup_sqlite_database, generate_daily_report
+from xroiq_storage_decisions import get_storage_decisions
 from xroiq_work_intelligence_service import (
     DEFAULT_CONFIG,
     DEFAULT_CONFIG_PATH,
@@ -146,6 +148,11 @@ def summary() -> Dict[str, Any]:
     }
 
 
+@app.get("/api/storage-decisions")
+def storage_decisions() -> Dict[str, Any]:
+    return get_storage_decisions(get_dashboard_config(), get_database_path())
+
+
 @app.post("/api/actions/refresh-device-health")
 def action_refresh_device_health() -> Dict[str, Any]:
     db_path = get_database_path()
@@ -220,6 +227,39 @@ def action_generate_daily_report() -> Dict[str, Any]:
             notes="Daily report was not created.",
             success=False,
             report_path=None,
+        )
+
+
+@app.post("/api/actions/generate-founder-intelligence-report")
+def action_generate_founder_intelligence_report() -> Dict[str, Any]:
+    db_path = get_database_path()
+    try:
+        report_path = generate_founder_intelligence_report(
+            get_dashboard_config(),
+            db_path,
+            output_root=_backup_root(),
+        )
+        return _record_action(
+            db_path,
+            action_type="generate_founder_intelligence_report",
+            status="ok",
+            files_processed=1,
+            errors="",
+            notes=f"Founder intelligence report created: {report_path}",
+            success=True,
+            path=str(report_path),
+        )
+    except Exception as exc:
+        log.exception("Founder intelligence report action failed")
+        return _record_action(
+            db_path,
+            action_type="generate_founder_intelligence_report",
+            status="failed",
+            files_processed=0,
+            errors=str(exc),
+            notes="Founder intelligence report was not created.",
+            success=False,
+            path=None,
         )
 
 

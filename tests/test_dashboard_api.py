@@ -154,6 +154,7 @@ def test_existing_endpoints_still_pass(monkeypatch, tmp_path):
     assert client.get("/api/health").status_code == 200
     assert client.get("/api/events").status_code == 200
     assert client.get("/api/sessions").status_code == 200
+    assert client.get("/api/storage-decisions").status_code == 200
 
 
 def test_action_refresh_device_health_writes_action(monkeypatch, tmp_path):
@@ -241,4 +242,113 @@ def test_action_open_logs_returns_gracefully_and_writes_action(monkeypatch, tmp_
     assert body["errors"] == ""
     actions = list_actions(db_path)
     assert actions[0]["action_type"] == "open_logs"
+    assert actions[0]["status"] == "ok"
+
+
+def test_api_storage_decisions_returns_missing_device_warnings(monkeypatch, tmp_path):
+    config_path, _db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+
+    response = TestClient(app).get("/api/storage-decisions")
+
+    assert response.status_code == 200
+    body = response.json()
+    warning_ids = {warning["device_id"] for warning in body["warnings"]}
+    assert {"STR-003", "STR-001"}.issubset(warning_ids)
+    assert body["count"] == 0
+
+
+def test_api_storage_decisions_recent_created_recommends_sync_to_microsd(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    microsd_root = tmp_path / "microsd"
+    microsd_root.mkdir()
+    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config["microsd_root"] = str(microsd_root)
+    config_path.write_text(json.dumps(config), encoding="utf-8")
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    init_db(db_path)
+    insert_event(
+        db_path,
+        {
+            "event_id": "EVT-KEEP",
+            "event_time": datetime.now().isoformat(),
+            "event_type": "created",
+            "file_name": "active.py",
+            "full_path": str(tmp_path / "work" / "active.py"),
+            "category": "Build",
+        },
+    )
+
+    response = TestClient(app).get("/api/storage-decisions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["recommendation"] == "sync_to_microsd"
+    assert body["items"][0]["target"] == "microsd"
+    assert body["items"][0]["reason"] == "Recent active file should stay on laptop and be mirrored to available microSD."
+
+
+def test_api_storage_decisions_deleted_event_recommends_ignore(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    init_db(db_path)
+    insert_event(
+        db_path,
+        {
+            "event_id": "EVT-IGNORE",
+            "event_time": datetime.now().isoformat(),
+            "event_type": "deleted",
+            "file_name": "removed.txt",
+            "full_path": str(tmp_path / "work" / "removed.txt"),
+            "category": "R&D",
+        },
+    )
+
+    response = TestClient(app).get("/api/storage-decisions")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["items"][0]["recommendation"] == "ignore"
+    assert body["items"][0]["target"] == "none"
+
+
+def test_founder_intelligence_report_creates_markdown(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    init_db(db_path)
+    insert_event(
+        db_path,
+        {
+            "event_id": "EVT-FOUNDER",
+            "event_time": datetime.now().isoformat(),
+            "event_type": "modified",
+            "file_name": "evidence.md",
+            "category": "R&D",
+        },
+    )
+
+    response = TestClient(app).post("/api/actions/generate-founder-intelligence-report")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    report_path = dashboard_main.Path(body["path"])
+    assert report_path.exists()
+    content = report_path.read_text(encoding="utf-8")
+    assert "# XROIQ Founder Intelligence Report" in content
+    assert "## Storage Intelligence" in content
+    assert "## Next Best Actions" in content
+
+
+def test_action_generate_founder_intelligence_report_writes_action(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+
+    response = TestClient(app).post("/api/actions/generate-founder-intelligence-report")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["action_type"] == "generate_founder_intelligence_report"
+    actions = list_actions(db_path)
+    assert actions[0]["action_type"] == "generate_founder_intelligence_report"
     assert actions[0]["status"] == "ok"

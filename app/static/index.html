@@ -59,7 +59,29 @@
           <button type="button" data-command="refreshDeviceHealth">Refresh Device Health</button>
           <button type="button" data-command="backupSqlite">Backup SQLite DB</button>
           <button type="button" data-command="generateDailyReport">Generate Daily Report</button>
+          <button type="button" data-command="generateFounderIntelligenceReport">Generate Founder Intelligence Report</button>
           <button type="button" data-command="openLogs">Open Logs Folder</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Storage Decisions</h2>
+        </div>
+        <div id="storageWarnings" class="warning-list"></div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Recommendation</th>
+                <th>File</th>
+                <th>Category</th>
+                <th>Target</th>
+                <th>Reason</th>
+              </tr>
+            </thead>
+            <tbody id="storageDecisionsBody"></tbody>
+          </table>
         </div>
       </section>
 
