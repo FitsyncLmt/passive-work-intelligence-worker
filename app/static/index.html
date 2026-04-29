@@ -52,6 +52,19 @@
 
       <section class="panel">
         <div class="panel-heading">
+          <h2>Command Centre</h2>
+          <span id="commandStatus" class="muted">Ready</span>
+        </div>
+        <div class="command-grid">
+          <button type="button" data-command="refreshDeviceHealth">Refresh Device Health</button>
+          <button type="button" data-command="backupSqlite">Backup SQLite DB</button>
+          <button type="button" data-command="generateDailyReport">Generate Daily Report</button>
+          <button type="button" data-command="openLogs">Open Logs Folder</button>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
           <h2>Device Health</h2>
         </div>
         <div id="deviceHealthList" class="device-grid"></div>

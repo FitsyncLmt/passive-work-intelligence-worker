@@ -266,11 +266,40 @@ tbody tr:hover {
   color: var(--muted);
 }
 
+.ok-text {
+  color: var(--ok);
+}
+
+.bad-text {
+  color: var(--bad);
+}
+
+.command-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+button {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 10px 12px;
+  background: var(--panel-soft);
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+
+button:hover {
+  border-color: var(--accent);
+}
+
 @media (max-width: 900px) {
   .summary-grid,
   .status-list,
   .two-column,
-  .device-grid {
+  .device-grid,
+  .command-grid {
     grid-template-columns: 1fr;
   }
 

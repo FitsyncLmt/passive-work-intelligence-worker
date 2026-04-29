@@ -2,6 +2,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
+from datetime import datetime
 from pathlib import Path
 from typing import Any, AsyncIterator, Dict
 
@@ -15,12 +16,14 @@ from xroiq_store import (
     get_recent_activity_summary,
     get_session_totals_by_category,
     init_db,
+    insert_action,
     list_actions,
     list_devices,
     list_events,
     list_sessions,
 )
 from xroiq_device_intelligence import refresh_configured_device_health
+from xroiq_reports import backup_sqlite_database, generate_daily_report
 from xroiq_work_intelligence_service import (
     DEFAULT_CONFIG,
     DEFAULT_CONFIG_PATH,
@@ -90,7 +93,7 @@ app.add_middleware(
         "http://localhost:8765",
     ],
     allow_credentials=False,
-    allow_methods=["GET"],
+    allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
 
@@ -143,10 +146,170 @@ def summary() -> Dict[str, Any]:
     }
 
 
+@app.post("/api/actions/refresh-device-health")
+def action_refresh_device_health() -> Dict[str, Any]:
+    db_path = get_database_path()
+    items = refresh_configured_device_health(get_dashboard_config(), db_path)
+    return _record_action(
+        db_path,
+        action_type="refresh_device_health",
+        status="ok",
+        files_processed=len(items),
+        errors="",
+        notes=f"Refreshed {len(items)} configured devices.",
+        success=True,
+    )
+
+
+@app.post("/api/actions/backup-sqlite")
+def action_backup_sqlite() -> Dict[str, Any]:
+    db_path = get_database_path()
+    try:
+        destination = backup_sqlite_database(db_path, _backup_root())
+        return _record_action(
+            db_path,
+            action_type="backup_sqlite",
+            status="ok",
+            files_processed=1,
+            errors="",
+            notes=f"SQLite snapshot created: {destination}",
+            success=True,
+            destination_path=str(destination),
+        )
+    except Exception as exc:
+        log.exception("SQLite backup action failed")
+        return _record_action(
+            db_path,
+            action_type="backup_sqlite",
+            status="failed",
+            files_processed=0,
+            errors=str(exc),
+            notes="SQLite snapshot was not created.",
+            success=False,
+            destination_path=None,
+        )
+
+
+@app.post("/api/actions/generate-daily-report")
+def action_generate_daily_report() -> Dict[str, Any]:
+    db_path = get_database_path()
+    try:
+        report_path = generate_daily_report(
+            db_path=db_path,
+            backup_root=_backup_root(),
+            config=get_dashboard_config(),
+        )
+        return _record_action(
+            db_path,
+            action_type="generate_daily_report",
+            status="ok",
+            files_processed=1,
+            errors="",
+            notes=f"Daily report created: {report_path}",
+            success=True,
+            report_path=str(report_path),
+        )
+    except Exception as exc:
+        log.exception("Daily report action failed")
+        return _record_action(
+            db_path,
+            action_type="generate_daily_report",
+            status="failed",
+            files_processed=0,
+            errors=str(exc),
+            notes="Daily report was not created.",
+            success=False,
+            report_path=None,
+        )
+
+
+@app.post("/api/actions/open-logs")
+def action_open_logs() -> Dict[str, Any]:
+    db_path = get_database_path()
+    logs_path = _backup_root()
+    logs_path.mkdir(parents=True, exist_ok=True)
+    if os.name == "nt" and hasattr(os, "startfile"):
+        try:
+            os.startfile(str(logs_path))  # type: ignore[attr-defined]
+            return _record_action(
+                db_path,
+                action_type="open_logs",
+                status="ok",
+                files_processed=1,
+                errors="",
+                notes=f"Opened logs folder: {logs_path}",
+                success=True,
+                logs_path=str(logs_path),
+            )
+        except Exception as exc:
+            log.exception("Open logs action failed")
+            return _record_action(
+                db_path,
+                action_type="open_logs",
+                status="failed",
+                files_processed=0,
+                errors=str(exc),
+                notes=f"Failed to open logs folder: {logs_path}",
+                success=False,
+                logs_path=str(logs_path),
+            )
+
+    return _record_action(
+        db_path,
+        action_type="open_logs",
+        status="unsupported",
+        files_processed=0,
+        errors="unsupported",
+        notes=f"Opening folders is unsupported on this platform: {logs_path}",
+        success=False,
+        logs_path=str(logs_path),
+    )
+
+
 @app.get("/api/actions")
 def actions(limit: int = 100) -> Dict[str, Any]:
     rows = list_actions(get_database_path(), limit=limit)
     return {"items": rows, "count": len(rows)}
+
+
+def _backup_root() -> Path:
+    config = get_dashboard_config()
+    return Path(config.get("backup_root") or DEFAULT_CONFIG["backup_root"]).expanduser()
+
+
+def _record_action(
+    db_path,
+    *,
+    action_type: str,
+    status: str,
+    files_processed: int,
+    errors: str,
+    notes: str,
+    success: bool,
+    **extra: Any,
+) -> Dict[str, Any]:
+    payload = {
+        "action_time": datetime.now().isoformat(),
+        "action_type": action_type,
+        "status": status,
+        "files_processed": files_processed,
+        "errors": errors,
+        "notes": notes,
+    }
+    try:
+        init_db(db_path)
+        insert_action(db_path, payload)
+    except Exception:
+        log.exception("Failed to write dashboard action row")
+    response = {
+        "success": success,
+        "action_type": action_type,
+        "files_processed": files_processed,
+        "errors": errors,
+        "notes": notes,
+    }
+    response.update(extra)
+    return response
 
 
 app.mount("/", StaticFiles(directory=STATIC_DIR, html=True), name="dashboard")

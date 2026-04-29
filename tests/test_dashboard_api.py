@@ -3,8 +3,9 @@ from datetime import datetime, timedelta
 
 from fastapi.testclient import TestClient
 
+import app.main as dashboard_main
 from app.main import app
-from xroiq_store import init_db, insert_event, insert_session, list_devices
+from xroiq_store import init_db, insert_event, insert_session, list_actions, list_devices
 
 
 def write_config(tmp_path):
@@ -153,3 +154,91 @@ def test_existing_endpoints_still_pass(monkeypatch, tmp_path):
     assert client.get("/api/health").status_code == 200
     assert client.get("/api/events").status_code == 200
     assert client.get("/api/sessions").status_code == 200
+
+
+def test_action_refresh_device_health_writes_action(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+
+    response = TestClient(app).post("/api/actions/refresh-device-health")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["action_type"] == "refresh_device_health"
+    assert body["files_processed"] == 5
+    actions = list_actions(db_path)
+    assert actions[0]["action_type"] == "refresh_device_health"
+    assert actions[0]["status"] == "ok"
+
+
+def test_action_backup_sqlite_creates_snapshot_and_action(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    init_db(db_path)
+    insert_event(db_path, {"event_id": "EVT-BACKUP", "event_time": datetime.now().isoformat()})
+
+    response = TestClient(app).post("/api/actions/backup-sqlite")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    destination = tmp_path / "logs" / "db_snapshots"
+    snapshot_path = body["destination_path"]
+    assert snapshot_path.startswith(str(destination))
+    assert snapshot_path.endswith(".db")
+    assert dashboard_main.Path(snapshot_path).exists()
+    assert db_path.exists()
+    actions = list_actions(db_path)
+    assert actions[0]["action_type"] == "backup_sqlite"
+    assert actions[0]["files_processed"] == 1
+
+
+def test_action_generate_daily_report_creates_markdown_and_action(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    init_db(db_path)
+    insert_event(
+        db_path,
+        {
+            "event_id": "EVT-REPORT",
+            "event_time": datetime.now().isoformat(),
+            "event_type": "created",
+            "file_name": "report.py",
+            "category": "Build",
+        },
+    )
+    insert_session(db_path, {"session_key": "SESSION-REPORT", "category": "Build", "duration_minutes": 15})
+
+    response = TestClient(app).post("/api/actions/generate-daily-report")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    report_path = dashboard_main.Path(body["report_path"])
+    assert report_path.exists()
+    assert report_path.name.startswith("xroiq_daily_report_")
+    content = report_path.read_text(encoding="utf-8")
+    assert "# XROIQ Daily Work Intelligence Report" in content
+    assert "## Events by Category" in content
+    assert "## Device Health" in content
+    actions = list_actions(db_path)
+    assert actions[0]["action_type"] == "generate_daily_report"
+    assert actions[0]["files_processed"] == 1
+
+
+def test_action_open_logs_returns_gracefully_and_writes_action(monkeypatch, tmp_path):
+    config_path, db_path = write_device_config(tmp_path)
+    monkeypatch.setenv("XROIQ_CONFIG_PATH", str(config_path))
+    monkeypatch.setattr(dashboard_main.os, "startfile", lambda _path: None, raising=False)
+
+    response = TestClient(app).post("/api/actions/open-logs")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert body["success"] is True
+    assert body["action_type"] == "open_logs"
+    assert body["errors"] == ""
+    actions = list_actions(db_path)
+    assert actions[0]["action_type"] == "open_logs"
+    assert actions[0]["status"] == "ok"
