@@ -50,7 +50,8 @@ body {
 }
 
 h1,
-h2 {
+h2,
+h3 {
   margin: 0;
   letter-spacing: 0;
 }
@@ -61,6 +62,15 @@ h1 {
 
 h2 {
   font-size: 16px;
+}
+
+h3 {
+  margin-top: 16px;
+  margin-bottom: 10px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .status-pill {
@@ -81,7 +91,7 @@ h2 {
 
 .summary-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: 12px;
 }
 
@@ -123,6 +133,10 @@ dt {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   margin: 0;
+}
+
+.status-list.compact {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 .status-list div {
@@ -172,6 +186,10 @@ tbody tr:hover {
   gap: 10px;
 }
 
+.compact-list {
+  gap: 8px;
+}
+
 .list-item {
   border: 1px solid var(--line);
   border-radius: 6px;
@@ -179,9 +197,69 @@ tbody tr:hover {
   background: var(--panel-soft);
 }
 
+.row-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
 .list-item strong {
   display: block;
   margin-bottom: 4px;
+}
+
+.row-item strong {
+  margin-bottom: 0;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.device-card {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px;
+  background: var(--panel-soft);
+}
+
+.device-card.missing {
+  border-color: var(--bad);
+  background: rgba(248, 81, 73, 0.08);
+}
+
+.device-card.available {
+  border-color: rgba(63, 185, 80, 0.55);
+}
+
+.device-title {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.device-title span {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  color: var(--ok);
+  font-size: 12px;
+  text-transform: uppercase;
+}
+
+.device-card.missing .device-title span {
+  color: var(--bad);
+}
+
+.device-card dl {
+  display: grid;
+  gap: 8px;
+  margin: 0;
 }
 
 .muted {
@@ -191,7 +269,8 @@ tbody tr:hover {
 @media (max-width: 900px) {
   .summary-grid,
   .status-list,
-  .two-column {
+  .two-column,
+  .device-grid {
     grid-template-columns: 1fr;
   }
 

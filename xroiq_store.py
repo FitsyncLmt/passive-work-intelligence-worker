@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -190,6 +191,70 @@ def upsert_device(db_path, device: Dict[str, Any]) -> int:
 
 def list_devices(db_path) -> List[Dict[str, Any]]:
     return _list_rows(db_path, "devices", 1000)
+
+
+def get_event_counts_by_category(db_path) -> Dict[str, int]:
+    init_db(db_path)
+    with sqlite3.connect(Path(db_path)) as connection:
+        cursor = connection.execute(
+            """
+            SELECT COALESCE(NULLIF(category, ''), 'Uncategorized') AS category,
+                   COUNT(*) AS total
+            FROM events
+            GROUP BY COALESCE(NULLIF(category, ''), 'Uncategorized')
+            ORDER BY category
+            """
+        )
+        return {str(row[0]): int(row[1]) for row in cursor.fetchall()}
+
+
+def get_recent_activity_summary(db_path, hours: int = 24) -> Dict[str, Any]:
+    init_db(db_path)
+    cutoff = (datetime.now() - timedelta(hours=int(hours))).isoformat()
+    with sqlite3.connect(Path(db_path)) as connection:
+        cursor = connection.execute(
+            """
+            SELECT COUNT(*) AS total
+            FROM events
+            WHERE event_time IS NOT NULL
+              AND event_time >= ?
+            """,
+            (cutoff,),
+        )
+        count = int(cursor.fetchone()[0])
+    return {"hours": int(hours), "event_count": count}
+
+
+def get_session_totals_by_category(db_path) -> Dict[str, float]:
+    init_db(db_path)
+    with sqlite3.connect(Path(db_path)) as connection:
+        cursor = connection.execute(
+            """
+            SELECT COALESCE(NULLIF(category, ''), 'Uncategorized') AS category,
+                   COALESCE(SUM(duration_minutes), 0) AS total_minutes
+            FROM sessions
+            GROUP BY COALESCE(NULLIF(category, ''), 'Uncategorized')
+            ORDER BY category
+            """
+        )
+        return {str(row[0]): float(row[1] or 0) for row in cursor.fetchall()}
+
+
+def get_latest_event_time(db_path) -> Optional[str]:
+    init_db(db_path)
+    with sqlite3.connect(Path(db_path)) as connection:
+        cursor = connection.execute(
+            """
+            SELECT event_time
+            FROM events
+            WHERE event_time IS NOT NULL
+              AND event_time != ''
+            ORDER BY event_time DESC
+            LIMIT 1
+            """
+        )
+        row = cursor.fetchone()
+        return str(row[0]) if row and row[0] is not None else None
 
 
 def insert_action(db_path, action: Dict[str, Any]) -> int:

@@ -16,6 +16,7 @@ from watchdog.events import FileSystemEventHandler
 from watchdog.observers import Observer
 
 from xroiq_store import init_db, insert_event, insert_session
+from xroiq_device_intelligence import refresh_configured_device_health
 
 
 APP_NAME = "XROIQ Work Intelligence Service"
@@ -512,9 +513,11 @@ class WorkIntelligenceService:
         try:
             init_db(self.database_path)
             self.log.info("SQLite database initialized: %s", self.database_path)
+            refresh_configured_device_health(self.config, self.database_path)
+            self.log.info("Device intelligence snapshot updated")
         except Exception:
             self.log.error(
-                "SQLite database initialization failed; continuing with Excel logging",
+                "SQLite/device intelligence setup failed; continuing with Excel logging",
                 exc_info=True,
             )
         self._warn_optional_mounts()

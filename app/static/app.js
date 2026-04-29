@@ -3,6 +3,8 @@ const endpoints = {
   events: "/api/events",
   sessions: "/api/sessions",
   devices: "/api/devices",
+  deviceHealth: "/api/device-health",
+  summary: "/api/summary",
   actions: "/api/actions",
 };
 
@@ -64,6 +66,43 @@ function renderDevices(devices) {
   `).join("") : `<div class="muted">No devices recorded.</div>`;
 }
 
+function renderDeviceHealth(devices) {
+  const list = document.getElementById("deviceHealthList");
+  list.innerHTML = devices.length ? devices.map((device) => `
+    <div class="device-card ${device.status === "missing" ? "missing" : "available"}">
+      <div class="device-title">
+        <strong>${text(device.name)}</strong>
+        <span>${text(device.status)}</span>
+      </div>
+      <dl>
+        <div><dt>Role</dt><dd>${text(device.role)}</dd></div>
+        <div><dt>Path</dt><dd>${text(device.drive_path || device.drive_letter)}</dd></div>
+        <div><dt>Free</dt><dd>${device.free_space_gb === null || device.free_space_gb === undefined ? "-" : `${device.free_space_gb} GB`}</dd></div>
+        <div><dt>Last Seen</dt><dd>${text(device.last_seen)}</dd></div>
+      </dl>
+    </div>
+  `).join("") : `<div class="muted">No configured devices found.</div>`;
+}
+
+function renderKeyValueList(id, values, unit) {
+  const list = document.getElementById(id);
+  const entries = Object.entries(values || {});
+  list.innerHTML = entries.length ? entries.map(([name, value]) => `
+    <div class="list-item row-item">
+      <strong>${text(name)}</strong>
+      <span>${text(value)}${unit}</span>
+    </div>
+  `).join("") : `<div class="muted">No category data recorded.</div>`;
+}
+
+function renderSummary(summary) {
+  document.getElementById("latestEventTime").textContent = text(summary.latest_event_time);
+  document.getElementById("summaryLast24h").textContent = text(summary.last_24h_event_count);
+  document.getElementById("last24hCount").textContent = text(summary.last_24h_event_count);
+  renderKeyValueList("eventsByCategory", summary.events_by_category, "");
+  renderKeyValueList("sessionMinutesByCategory", summary.session_minutes_by_category, " min");
+}
+
 function renderActions(actions) {
   const list = document.getElementById("actionsList");
   list.innerHTML = actions.length ? actions.map((action) => `
@@ -77,11 +116,13 @@ function renderActions(actions) {
 
 async function refresh() {
   try {
-    const [health, events, sessions, devices, actions] = await Promise.all([
+    const [health, events, sessions, devices, deviceHealth, summary, actions] = await Promise.all([
       fetchJson(endpoints.health),
       fetchJson(endpoints.events),
       fetchJson(endpoints.sessions),
       fetchJson(endpoints.devices),
+      fetchJson(endpoints.deviceHealth),
+      fetchJson(endpoints.summary),
       fetchJson(endpoints.actions),
     ]);
 
@@ -95,6 +136,8 @@ async function refresh() {
 
     renderEvents(events.items);
     renderSessions(sessions.items);
+    renderDeviceHealth(deviceHealth.items);
+    renderSummary(summary);
     renderDevices(devices.items);
     renderActions(actions.items);
     setStatus(true, "Live");

@@ -33,6 +33,10 @@
           <span>Devices</span>
           <strong id="devicesCount">0</strong>
         </article>
+        <article class="summary-card">
+          <span>Last 24h</span>
+          <strong id="last24hCount">0</strong>
+        </article>
       </section>
 
       <section class="panel">
@@ -44,6 +48,33 @@
           <div><dt>Database</dt><dd id="databasePath">-</dd></div>
           <div><dt>Last Refresh</dt><dd id="lastRefresh">-</dd></div>
         </dl>
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <h2>Device Health</h2>
+        </div>
+        <div id="deviceHealthList" class="device-grid"></div>
+      </section>
+
+      <section class="panel two-column">
+        <div>
+          <div class="panel-heading">
+            <h2>Summary Brain</h2>
+          </div>
+          <dl class="status-list compact">
+            <div><dt>Latest Event</dt><dd id="latestEventTime">-</dd></div>
+            <div><dt>Last 24h Count</dt><dd id="summaryLast24h">0</dd></div>
+          </dl>
+          <h3>Events by Category</h3>
+          <div id="eventsByCategory" class="list compact-list"></div>
+        </div>
+        <div>
+          <div class="panel-heading">
+            <h2>Session Minutes</h2>
+          </div>
+          <div id="sessionMinutesByCategory" class="list compact-list"></div>
+        </div>
       </section>
 
       <section class="panel">

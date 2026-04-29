@@ -10,13 +10,22 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from xroiq_store import (
+    get_event_counts_by_category,
+    get_latest_event_time,
+    get_recent_activity_summary,
+    get_session_totals_by_category,
     init_db,
     list_actions,
     list_devices,
     list_events,
     list_sessions,
 )
-from xroiq_work_intelligence_service import DEFAULT_CONFIG_PATH, DEFAULT_DATABASE_PATH
+from xroiq_device_intelligence import refresh_configured_device_health
+from xroiq_work_intelligence_service import (
+    DEFAULT_CONFIG,
+    DEFAULT_CONFIG_PATH,
+    DEFAULT_DATABASE_PATH,
+)
 
 
 APP_NAME = "XROIQ Work Intelligence Dashboard"
@@ -26,16 +35,23 @@ log = logging.getLogger(APP_NAME)
 logging.basicConfig(level=logging.INFO, format="%(asctime)s | %(levelname)s | %(message)s")
 
 
-def get_database_path() -> Path:
+def get_dashboard_config() -> Dict[str, Any]:
     config_path = Path(os.getenv("XROIQ_CONFIG_PATH", DEFAULT_CONFIG_PATH))
     if config_path.exists():
         try:
-            config = json.loads(config_path.read_text(encoding="utf-8"))
-            database_path = config.get("database_path") or DEFAULT_DATABASE_PATH
-            return Path(database_path).expanduser()
+            loaded = json.loads(config_path.read_text(encoding="utf-8"))
+            config = dict(DEFAULT_CONFIG)
+            config.update(loaded)
+            return config
         except Exception:
             log.exception("Failed to read dashboard config; using default database path")
-    return Path(DEFAULT_DATABASE_PATH).expanduser()
+    return dict(DEFAULT_CONFIG)
+
+
+def get_database_path() -> Path:
+    config = get_dashboard_config()
+    database_path = config.get("database_path") or DEFAULT_DATABASE_PATH
+    return Path(database_path).expanduser()
 
 
 def database_status() -> Dict[str, Any]:
@@ -107,6 +123,24 @@ def sessions(limit: int = 100) -> Dict[str, Any]:
 def devices() -> Dict[str, Any]:
     rows = list_devices(get_database_path())
     return {"items": rows, "count": len(rows)}
+
+
+@app.get("/api/device-health")
+def device_health() -> Dict[str, Any]:
+    rows = refresh_configured_device_health(get_dashboard_config(), get_database_path())
+    return {"items": rows, "count": len(rows)}
+
+
+@app.get("/api/summary")
+def summary() -> Dict[str, Any]:
+    db_path = get_database_path()
+    recent = get_recent_activity_summary(db_path, hours=24)
+    return {
+        "events_by_category": get_event_counts_by_category(db_path),
+        "session_minutes_by_category": get_session_totals_by_category(db_path),
+        "latest_event_time": get_latest_event_time(db_path),
+        "last_24h_event_count": recent["event_count"],
+    }
 
 
 @app.get("/api/actions")
