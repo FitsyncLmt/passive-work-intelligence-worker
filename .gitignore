@@ -15,3 +15,7 @@ fallback_events.jsonl
 work_intelligence_service.log
 .env
 '@ | Set-Content .gitignore -Encoding UTF8
+
+tmp_pytest/
+tmp_pytest_*/
+tmp_pytest_full_after_sqlite/
